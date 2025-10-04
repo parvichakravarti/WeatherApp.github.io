@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weather & Climate — Check City Weather</title>
+  <style>
+    :root{
+      --accent:#2563eb; /* blue */
+      --accent-2:#06b6d4; /* teal */
+      --muted:#6b7280;
+      --glass: rgba(255,255,255,0.9);
+      --card-shadow: 0 8px 30px rgba(20,20,50,0.08);
+      --radius:14px;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body{
+      margin:0;
+      background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+      color:#0f172a;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      padding:32px;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:700px;
+      background:var(--glass);
+      border-radius:var(--radius);
+      box-shadow:var(--card-shadow);
+      padding:28px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(99,102,241,0.1);
+      text-align:center;
+    }
+
+    header{
+      margin-bottom:20px;
+    }
+
+    .logo{
+      width:70px;height:70px;margin:0 auto 12px;
+      border-radius:16px;
+      background: linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:24px;
+      box-shadow: 0 6px 18px rgba(37,99,235,0.25);
+    }
+
+    h1{font-size:24px;margin:0 0 4px;}
+    p.lead{margin:0;color:var(--muted);font-size:14px}
+
+    .controls{
+      margin-top:20px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    input[type='text']{
+      padding:14px 16px;border-radius:12px;border:1px solid #e5e7eb;font-size:16px;outline:none;text-align:center;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    }
+    input[type='text']:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.15)}
+
+    button{
+      background: linear-gradient(90deg,var(--accent),#3b82f6);
+      border:none;color:white;padding:14px;border-radius:12px;font-weight:600;cursor:pointer;
+      box-shadow: 0 6px 18px rgba(37,99,235,0.25);font-size:16px;transition:transform 0.15s ease;
+    }
+    button:hover{transform:translateY(-2px)}
+    button:active{transform:translateY(1px)}
+
+    .result{
+      margin-top:28px;padding:20px;border-radius:12px;background:#ffffff;
+      display:flex;gap:16px;align-items:center;box-shadow: 0 8px 30px rgba(15,23,42,0.05);
+      text-align:left;
+    }
+
+    .left{
+      display:flex;flex-direction:column;gap:8px;min-width:180px;align-items:center;
+    }
+
+    .temp{
+      font-size:44px;font-weight:700;line-height:1;color:#0f172a;
+    }
+    .small{font-size:13px;color:var(--muted)}
+
+    .condition{
+      display:flex;flex-direction:column;gap:6px;align-items:flex-start;
+    }
+
+    .meta{display:flex;gap:12px;margin-top:8px;color:var(--muted);font-size:13px}
+
+    .icon{
+      width:96px;height:96px;background:linear-gradient(180deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;border-radius:12px;
+    }
+
+    .footer-note{margin-top:14px;color:var(--muted);font-size:13px}
+
+    .hidden{display:none}
+
+    .error{padding:12px;border-radius:10px;background:#fff6f6;color:#7f1d1d;border:1px solid #fee2e2}
+
+    @media (max-width:560px){
+      .result{flex-direction:column;align-items:stretch}
+      .left{flex-direction:row;justify-content:space-between;align-items:center}
+      .icon{width:72px;height:72px}
+      .temp{font-size:36px}
+    }
+
+    .loader{
+      width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-left:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <header>
+      <div class="logo">W</div>
+      <h1>Weather & Climate</h1>
+      <p class="lead">Enter a city and click below to check the weather worldwide.</p>
+    </header>
+
+    <div class="controls" aria-label="search-controls">
+      <input id="cityInput" type="text" placeholder="Enter city (e.g. London or Tokyo)" aria-label="city input" />
+      <button id="checkBtn">Check Weather</button>
+    </div>
+
+    <div id="message" class="footer-note" aria-live="polite">Powered by WeatherAPI — current weather data.</div>
+
+    <div id="output" class="hidden"></div>
+
+  </div>
+
+  <script>
+    const API_KEY = '19e2a446f1e247ccae122251250410';
+    const BASE = 'https://api.weatherapi.com/v1/current.json';
+
+    const input = document.getElementById('cityInput');
+    const btn = document.getElementById('checkBtn');
+    const output = document.getElementById('output');
+    const message = document.getElementById('message');
+
+    function showMessage(text, isError = false){
+      message.textContent = text;
+      message.className = isError ? 'footer-note error' : 'footer-note';
+    }
+
+    function renderWeather(data){
+      const loc = data.location;
+      const cur = data.current;
+      const iconUrl = cur.condition.icon.startsWith('http') ? cur.condition.icon : 'https:' + cur.condition.icon;
+
+      const html = `
+        <div class="result">
+          <div class="left">
+            <div class="icon"><img src="${iconUrl}" alt="${cur.condition.text}" width="64" height="64" /></div>
+            <div>
+              <div style="font-weight:700">${loc.name}, ${loc.country}</div>
+              <div class="small">Local time: ${loc.localtime}</div>
+            </div>
+          </div>
+
+          <div class="condition">
+            <div class="temp">${parseFloat(cur.temp_c).toFixed(1)}°C <span style="font-weight:600;color:var(--muted);font-size:14px">(${parseFloat(cur.temp_f).toFixed(1)}°F)</span></div>
+            <div style="font-size:16px;font-weight:600">${cur.condition.text}</div>
+            <div class="meta">
+              <div>Humidity: <strong>${cur.humidity}%</strong></div>
+              <div>Wind: <strong>${cur.wind_kph} kph</strong></div>
+              <div>Feels like: <strong>${cur.feelslike_c}°C</strong></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      output.innerHTML = html;
+      output.classList.remove('hidden');
+    }
+
+    async function fetchWeather(query){
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.innerHTML = 'Checking <span class="loader"></span>';
+      showMessage('Fetching weather...');
+
+      try{
+        const url = `${BASE}?key=${API_KEY}&q=${encodeURIComponent(query)}&aqi=yes`;
+        const res = await fetch(url);
+        if(!res.ok){
+          const err = await res.json().catch(()=>({error:{message: res.statusText}}));
+          throw new Error(err.error && err.error.message ? err.error.message : 'Network error');
+        }
+        const data = await res.json();
+        renderWeather(data);
+        showMessage('Weather updated.');
+      }catch(err){
+        output.classList.add('hidden');
+        showMessage('Error: '+err.message, true);
+      }finally{
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+
+    btn.addEventListener('click', ()=>{
+      const q = input.value.trim();
+      if(!q){ showMessage('Please enter a city name.', true); return; }
+      fetchWeather(q);
+    });
+
+    input.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter') btn.click();
+    });
+  </script>
+</body>
+</html>
